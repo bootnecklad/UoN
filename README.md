@@ -1,2 +1,2 @@
-# UoN
-Documentation for source code or projects at UoN
+# Miscellaneous
+Documentation for miscellaneous source code or projects.
