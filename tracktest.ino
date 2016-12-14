@@ -380,6 +380,4 @@ void loop()
 //  detectslope
 //  detectendofslope
 //  stop
- 
-    
 }
