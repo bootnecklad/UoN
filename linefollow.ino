@@ -15,7 +15,7 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
-#include <LiquidCrystal.h> // Allows use of LCD display
+#include <displayfuncs.h>
 
 // Global Constants
 const int BUFFER_VALUE = 256;
@@ -25,9 +25,6 @@ const int CALIBRATION_DELAY = 2000;
 const int LCD_ROW = 2;
 const int LCD_COLUMN = 16;
 const int BAUD_RATE = 57600;
-const int DIGITAL_LEFT = 6;
-const int DIGITAL_RIGHT = 7;
-const int STATUS_LED = 13;
 const int LOOP_DELAY = 0;
 
 const int TOO_FAST = 7;         // defines various error codes
@@ -43,14 +40,6 @@ float positionDeviationOld;     // Previous value of how far the sensor has devi
 float errorInPosition;          // Total error of sensor compared to the ideal/initial position
 
 
-// initialize the library with the interface pin numbers
-LiquidCrystal lcd(12 /* rs */,
-                  11 /* enable */,
-                  5  /* d0 */,
-                  4  /* d1 */,
-                  3  /* d2 */,
-                  2  /* d3 */);
-                  
 // Function Prototypes
 void setup();                   // called to initialize program
 void loop();                    // called on each loop iteration
@@ -59,7 +48,7 @@ float bufferError(float errorInPosition);
 float calculateError(float sensorPosition);
 float calculatePosition(int * sensorArray);
 long unsigned int counterAverage();
-void displayError(char errorCode);
+void displayErrorAndHalt(char errorCode);
 void displayStatus(float errorInPosition, int * sensorArray);
 void moveMotors(float errorInPosition, int motorSpeed);
 long unsigned int readCounter(char motor);
@@ -71,25 +60,16 @@ int * readSensorArrayDigital();
 
 void setup()
 {
-  int sensorArray, goButton;
+  int goButton;
   
   lcd.begin(LCD_COLUMN, LCD_ROW); // Setups LCD
   
   Serial.begin(BAUD_RATE); // Setups serial port communication to controller board
-  
-  pinMode(STATUS_LED, OUTPUT); // Status LED
-  pinMode(DIGITAL_LEFT, INPUT); // digital output of left sensor
-  pinMode(DIGITAL_RIGHT, INPUT); // digital output of right sensor
-  
-  // Initial values for deviation from line at calibration is zero
-  // Car is on the line so no deviation
-  positionDeviationSum = 0;
-  positionDeviationOld = 0;
 
   // Checks motorspeed, shouldn't be greater than 100
   if(MOTOR_SPEED > 100)
   {
-    displayError(TOO_FAST);
+    displayErrorAndHalt(TOO_FAST);
   }
 
   // Sets initial state of button on car
@@ -99,24 +79,19 @@ void setup()
   while(!goButton)
   {
     goButton = digitalRead(8);
-    // Prints out funny message
-    lcd.setCursor(0,0);
-    lcd.print("HELLO HUMANS");
-    lcd.setCursor(0,1);
-    // Humour is needed when the car doesn't work as desired
-    lcd.print("SHOW ME LINES");
-  }
-  
-  lcd.setCursor(0,0);
-  lcd.print("EAT LINE MODE:");
 
-  sensorArray = readSensorArrayAnalogue();
-  sensorPositionInitial = calculatePosition(sensorArray); // Fetches position to calibrate car on line.
+    // Humour is needed when the car doesn't work as desired
+    displayTextOnLCD(0,0,"HELLO HUMANS");
+    displayTextOnLCD(0,1,"SHOW ME LINES");
+  }
+
+  initialisePIDcontrol(); // Initialises values for PID control
 
   // Delays car before starting so user pressing button doesn't get run over 
   delay(CALIBRATION_DELAY);
-  lcd.setCursor(0,1);
-  lcd.print("ENGAGED");
+  
+  displayTextOnLCD(0,0,"EAT LINE MODE:");
+  displayTextOnLCD(0,1,"ENGAGED");
   lcd.clear();
 }
 
@@ -141,7 +116,20 @@ void loop()
 
   displayStatus(errorInPosition, sensorArray); // Continuously displays information on LCD on top of vehicle platform
   
-  delay(LOOP_DELAY); // Causes a delay inbetween each loop
+  //delay(LOOP_DELAY); // Causes a delay inbetween each loop
+}
+
+void initialisePIDcontrol()
+{
+  int sensorArray;
+  
+  // Initial values for deviation from line at calibration is zero
+  // Car is on the line so no deviation
+  positionDeviationSum = 0;
+  positionDeviationOld = 0;
+  
+  sensorArray = readSensorArrayAnalogue();
+  sensorPositionInitial = calculatePosition(sensorArray); // Fetches position to calibrate car on line.
 }
 
 void moveMotors(float errorInPosition, int motorSpeed)
@@ -281,9 +269,9 @@ float calculateError(float sensorPosition)
 {
   float positionDeviation, positionDeviationToIdeal, errorInPosition, calibrationConstantPosDev, calibrationConstantPosDevToIdeal, calibrationConstantPosDevOld;
   
-  calibrationConstantPosDev = 3;
-  calibrationConstantPosDevToIdeal = 5;
-  calibrationConstantPosDevOld = 0;
+  calibrationConstantPosDev = 1; // 3 at the end of last project week
+  calibrationConstantPosDevToIdeal = 1; // 5 at the end of last project week
+  calibrationConstantPosDevOld = 1;  // 0 at end of last project week
 
   positionDeviation = sensorPositionInitial - sensorPosition;
 
@@ -321,47 +309,4 @@ float calculatePosition(int * sensorArray)
   sensorPosition = sensorPosition * 1000;
 
   return sensorPosition;
-}
-
-
-void displayStatus(float errorInPosition, int * sensorArray)
-// INTERNAL FUNCTION: displayStatus()
-// ARGUMENTS: errorInPosition sensorArray
-// ARGUMENT TYPES: floating point pointer to array
-// DESCRIPTION: Displays error in position and the values of each sensor
-{  
-  lcd.setCursor(0,1);
-  lcd.print(*(sensorArray+0)); // DIRTY POINTER ARRAY HACK NOT PROUD :'(
-  
-  lcd.setCursor(2,1);
-  lcd.print(*(sensorArray+1));
-
-  lcd.setCursor(4,1);
-  lcd.print(*(sensorArray+2)); 
-
-  lcd.setCursor(8,1);
-  lcd.print(*(sensorArray+3)); 
-
-  lcd.setCursor(0,0);
-  lcd.print(errorInPosition);
-}
-
-void displayError(char errorCode)
-// INTERNAL FUNCTION: displayError()
-// ARGUMENTS: errorCode
-// ARGUMENT TYPES: char
-// DESCRIPTION: Displays error on LCD and stops motors to prevent damage
-{
-  Serial.write("#Hb"); // Command to halt both motors
-  lcd.clear(); // Clears LCD of everything
-  lcd.setCursor(0,0);
-  lcd.print("ERROR :("); // Errors are bad sad face :(
-  lcd.setCursor(0,1);
-  lcd.print(errorCode); // Displays error code given so team knows what to look up
-
-  // Sends controller into infinite loop so it does nothing
-  for(;;)
-  {
-    delay(1000);
-  }
 }
