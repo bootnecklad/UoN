@@ -16,9 +16,12 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 // Global Constants
-const int BUFFER_VALUE = 5000;
-const int REVERSE_CASE = BUFFER_VALUE / 4;
-const int MOTOR_SPEED = 20;
+const int BUFFER_VALUE = 2000;
+const int REVERSE_CASE = 1500;
+const int MAX_MOTOR_SPEED = 40;
+const int MIN_MOTOR_SPEED = -40;
+#define leftMotorBaseSpeed 20
+#define rightMotorBaseSpeed 20
 const int CALIBRATION_DELAY = 2000;
 const int LCD_ROW = 2;
 const int LCD_COLUMN = 16;
@@ -104,7 +107,6 @@ void loop()
   }
     
 
-  
   int sensorArray;
 
   fetchSensorValues();
@@ -114,9 +116,15 @@ void loop()
 
   errorInPosition = calculateError(sensorPosition); // Calculates the error in the position
 
+  lcd.setCursor(0,0);
+  lcd.print(errorInPosition);
+
   errorInPosition = bufferError(errorInPosition); // Buffers error as to not cause rapid movement
   
-  moveMotors(errorInPosition, MOTOR_SPEED); // Moves motors based on the error from initial position and the speed of the motor
+  lcd.setCursor(0,1);
+  lcd.print(errorInPosition);
+  
+  moveMotors(errorInPosition); // Moves motors based on the error from initial position and the speed of the motor
 
   //displayStatus(errorInPosition, sensorArray); // Continuously displays information on LCD on top of vehicle platform
   
@@ -163,7 +171,9 @@ void initialisePIDcontrol()
   sensorPositionInitial = calculatePosition(sensorArray); // Fetches position to calibrate car on line.
 }
 
-void moveMotors(float errorInPosition, int motorSpeed)
+
+
+void moveMotors(float errorInPosition)
 // INTERNAL FUNCTION: moveMotors()
 // ARGUMENTS: errorInPosition motorSpeed
 // ARGUMENT TYPES: floating point integer
@@ -177,67 +187,42 @@ Serial.print(lowByte((int)moveAmount)); // Serial.print throws bytes out  */
 {
   double moveAmount; //difference; // Move amount is a % of the total motor speed, 100% being fastest and 0% being nothing
 
-  // If error in position is +ve then slow a motor down to change direction
-  if((errorInPosition > 0) && (errorInPosition < REVERSE_CASE))
-  {
-    moveAmount = (errorInPosition / BUFFER_VALUE)*motorSpeed; // move amount of motor is based on the error value
-    moveAmount = motorSpeed - moveAmount; // creates change in motor speed
-    carController.write("#Dbf"); // Command to set direction of both motors forward
-    carController.write("#Sb0"); // Command to Start both motors
-    carController.print(lowByte((int)moveAmount)); // Outputs value of motor speed
-    carController.write(",0"); // Setsup for next motorspeed
-    carController.print(lowByte((int)motorSpeed)); // Outputs value of motor speed
-  }
+  int leftMotorSpeed, rightMotorSpeed;
 
-  // If error in position is -ve then slow a motor down to change direction
-  if((errorInPosition < 0) && (errorInPosition > -REVERSE_CASE))
-  {
-    moveAmount = (errorInPosition / -BUFFER_VALUE)*motorSpeed;
-    moveAmount = motorSpeed - moveAmount;
-    carController.write("#Dbf");
-    carController.write("#Sb0");
-    carController.print(lowByte((int)motorSpeed)); // Serial.print throws bytes out
-    carController.write(",0");
-    carController.print(lowByte((int)moveAmount)); // Serial.print throws bytes out
-  }
+  moveAmount = (errorInPosition / BUFFER_VALUE)*MAX_MOTOR_SPEED; // Move amount of motor is based on the error value
 
-  // If error in position is greater than a certain threshold then drastic action is required to bring vehicle platform back on course
-  // By reversing motors on one side and forward motion in the other the vehicle will turn on its own axis like a tank
-  if(errorInPosition > REVERSE_CASE)
-  {
-    moveAmount = (errorInPosition / BUFFER_VALUE)*motorSpeed; // move amount of motor is based on the error value
-    moveAmount = motorSpeed - moveAmount; // creates change in motor speed
-    carController.write("#D1r");
-    carController.write("#D2f");
-    //carController.write("#Sb035,020");
-    carController.write("#Sb0");
-    carController.print(lowByte((int)motorSpeed));
-    carController.write(",0");
-    carController.print(lowByte((int)motorSpeed));
-  }
+  leftMotorSpeed = leftMotorBaseSpeed - moveAmount;     // Calculate the modified motor speed
+  rightMotorSpeed = rightMotorBaseSpeed + moveAmount;
 
-  // If error in position is greater than a certain threshold then drastic action is required to bring vehicle platform back on course
-  // By reversing motors on one side and forward motion in the other the vehicle will turn on its own axis like a tank
-  if(errorInPosition < -REVERSE_CASE)
+  // Apply new speed and direction to each motor
+  if(leftMotorSpeed > 0)
   {
-    moveAmount = (errorInPosition / BUFFER_VALUE)*motorSpeed; // move amount of motor is based on the error value
-    moveAmount = motorSpeed - moveAmount; // creates change in motor speed
+    leftMotorSpeed = constrain(leftMotorSpeed, 0, MAX_MOTOR_SPEED);
     carController.write("#D1f");
-    carController.write("#D2r");
-    carController.write("#Sb0");
-    carController.print(lowByte((int)motorSpeed));
-    carController.write(",0");
-    carController.print(lowByte((int)motorSpeed));
+    carController.write("#S1");
+    carController.print((int)leftMotorSpeed);
+  }
+  else
+  {
+    leftMotorSpeed = constrain(leftMotorSpeed, MIN_MOTOR_SPEED, 0);
+    carController.write("#D1r");
+    carController.write("#S1");
+    carController.print(-(int)leftMotorSpeed);
   }
 
-  // If error in position is zero then vehicle is perfectly on the line, so move forward
-  if(errorInPosition == 0)
+  if(rightMotorSpeed > 0)
   {
-    carController.write("#Dbf");
-    carController.write("#Sb0");
-    carController.print(lowByte((int)motorSpeed));
-    carController.write(",0");
-    carController.print(lowByte((int)motorSpeed));
+    rightMotorSpeed = constrain(rightMotorSpeed, 0, MAX_MOTOR_SPEED);
+    carController.write("#D2f");
+    carController.write("#S2");
+    carController.print((int)rightMotorSpeed);
+  }
+  else
+  {
+    rightMotorSpeed = constrain(rightMotorSpeed, MIN_MOTOR_SPEED, 0);
+    carController.write("#D2r");
+    carController.write("#S2");
+    carController.print(-(int)rightMotorSpeed);
   }
 }
 
@@ -308,9 +293,9 @@ float calculateError(float sensorPosition)
 {
   float positionDeviation, positionDeviationToIdeal, errorInPosition, calibrationConstantPosDev, calibrationConstantPosDevToIdeal, calibrationConstantPosDevOld;
   
-  calibrationConstantPosDev = 1; // 3 at the end of last project week
+  calibrationConstantPosDev = 2; // 3 at the end of last project week
   calibrationConstantPosDevToIdeal = 1; // 5 at the end of last project week
-  calibrationConstantPosDevOld = 1;  // 0 at end of last project week
+  calibrationConstantPosDevOld = 0.01;  // 0 at end of last project week
 
   positionDeviation = sensorPositionInitial - sensorPosition;
 
@@ -320,7 +305,7 @@ float calculateError(float sensorPosition)
 
   positionDeviationOld = positionDeviation;
 
-  errorInPosition = calibrationConstantPosDev*positionDeviation + calibrationConstantPosDevToIdeal*positionDeviationToIdeal + calibrationConstantPosDevOld*positionDeviationOld;
+  errorInPosition = calibrationConstantPosDev*positionDeviation + calibrationConstantPosDevToIdeal*positionDeviationToIdeal + calibrationConstantPosDevOld*positionDeviationSum;
 
   return errorInPosition;
 }
@@ -334,14 +319,14 @@ float calculatePosition(int * sensorArray)
   int sensorValue0, sensorValue1, sensorValue2, sensorValue3, sensorValue4, sensorValue5, sensorValue6, sensorValue7, sensorSum;
   float sensorAverage, sensorPosition;
 
-  sensorValue0 = 1023 - *(sensorArray + 0);
-  sensorValue1 = 1023 - *(sensorArray + 1);
-  sensorValue2 = 1023 - *(sensorArray + 2);
-  sensorValue3 = 1023 - *(sensorArray + 3);
-  sensorValue4 = 1023 - *(sensorArray + 4);
-  sensorValue5 = 1023 - *(sensorArray + 5);
-  sensorValue6 = 1023 - *(sensorArray + 6);
-  sensorValue7 = 1023 - *(sensorArray + 7);
+  sensorValue0 = *(sensorArray + 0);
+  sensorValue1 = *(sensorArray + 1);
+  sensorValue2 = *(sensorArray + 2);
+  sensorValue3 = *(sensorArray + 3);
+  sensorValue4 = *(sensorArray + 4);
+  sensorValue5 = *(sensorArray + 5);
+  sensorValue6 = *(sensorArray + 6);
+  sensorValue7 = *(sensorArray + 7);
 
   sensorSum = sensorValue0 + sensorValue1 + sensorValue2 + sensorValue3 + sensorValue4 + sensorValue5 + sensorValue6 + sensorValue7;
 
@@ -349,10 +334,8 @@ float calculatePosition(int * sensorArray)
 
   sensorPosition = (float)sensorAverage/(float)sensorSum;
 
-  sensorPosition = sensorPosition * 1000;
-
-  lcd.setCursor(0,0);
-  lcd.print(sensorPosition);
+  sensorPosition = sensorPosition * 2000;
 
   return sensorPosition;
 }
+
