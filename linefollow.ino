@@ -250,7 +250,7 @@ float calculateError(float sensorPosition)
   
   calibrationConstantPosDev = 2; // 3 at the end of last project week
   calibrationConstantPosDevToIdeal = 1; // 5 at the end of last project week
-  calibrationConstantPosDevOld = 0.01;  // 0 at end of last project week
+  calibrationConstantPosDevOld = 0.05;  // 0 at end of last project week
 
   positionDeviation = sensorPositionInitial - sensorPosition;
 
