@@ -44,18 +44,12 @@ float errorInPosition;          // Total error of sensor compared to the ideal/i
 #include <SoftwareSerial.h>
 SoftwareSerial carController(9, 10);
 
-
-
 // LINE SENSOR SETUP
 #include <Wire.h>
 #define uchar unsigned char
 uchar t;
 //void send_data(short a1,short b1,short c1,short d1,short e1,short f1);
 uchar data[16];
-
-
-#include <LiquidCrystal.h>
-LiquidCrystal lcd(11, 12, 13, A2, A1, A0);
 
 
 void setup()
@@ -67,12 +61,7 @@ void setup()
   
   Wire.begin();
   t = 0;
-
-  lcd.begin(16,2);
-  lcd.print("HELLO");
-  delay(200);
-  lcd.clear();
-
+  
   // Sets initial state of button on car
   int goButton = 0;
 
@@ -82,12 +71,9 @@ void setup()
   while(!goButton)
   {
     goButton = digitalRead(2);
-    lcd.clear();
-    lcd.print(goButton);
   }
   
   initialisePIDcontrol(); // Initialises values for PID control
-  lcd.clear();
 }
 
 void loop()
@@ -105,24 +91,14 @@ void loop()
     carController.write("#Hb");
     initialisePIDcontrol();
   }
-    
-
-  int sensorArray;
 
   fetchSensorValues();
-  sensorArray = readSensorArray();
   
-  sensorPosition = calculatePosition(sensorArray); // Fetches current position of sensor
+  sensorPosition = calculatePosition(); // Fetches current position of sensor
 
   errorInPosition = calculateError(sensorPosition); // Calculates the error in the position
-
-  lcd.setCursor(0,0);
-  lcd.print(errorInPosition);
-
-  errorInPosition = bufferError(errorInPosition); // Buffers error as to not cause rapid movement
   
-  lcd.setCursor(0,1);
-  lcd.print(errorInPosition);
+  errorInPosition = bufferError(errorInPosition); // Buffers error as to not cause rapid movement
   
   moveMotors(errorInPosition); // Moves motors based on the error from initial position and the speed of the motor
 
@@ -157,18 +133,15 @@ void fetchSensorValues()
 }
 
 void initialisePIDcontrol()
-{
-  int sensorArray;
-  
+{  
   // Initial values for deviation from line at calibration is zero
   // Car is on the line so no deviation
   positionDeviationSum = 0;
   positionDeviationOld = 0;
 
   fetchSensorValues();
-  sensorArray = readSensorArray();
 
-  sensorPositionInitial = calculatePosition(sensorArray); // Fetches position to calibrate car on line.
+  sensorPositionInitial = calculatePosition(); // Fetches position to calibrate car on line.
 }
 
 
@@ -264,24 +237,6 @@ int * readSensorArray()
   sensorArray[6] = sensorData[6];
   sensorArray[7] = sensorData[7];
 
-
-//  lcd.setCursor(0,0);
-//  lcd.print(sensorArray[0]);
-//  lcd.print(" ");
-//  lcd.print(sensorArray[1]);
-//  lcd.print(" ");
-//  lcd.print(sensorArray[2]);
-//  lcd.print(" ");
-//  lcd.print(sensorArray[3]);
-//  lcd.setCursor(0,1);
-//  lcd.print(sensorArray[4]);
-//  lcd.print(" ");
-//  lcd.print(sensorArray[5]);
-//  lcd.print(" ");
-//  lcd.print(sensorArray[6]);
-//  lcd.print(" ");
-//  lcd.print(sensorArray[7]);
-
   return sensorArray;
 }
 
@@ -310,27 +265,18 @@ float calculateError(float sensorPosition)
   return errorInPosition;
 }
 
-float calculatePosition(int * sensorArray)
+float calculatePosition()
 // INTERNAL FUNCTION: fetchPosition()
 // ARGUMENTS: errorInPosition sensorArray
 // ARGUMENT TYPES: floating point pointer to array
 // DESCRIPTION: Displays error in position and the values of each sensor
 {
-  int sensorValue0, sensorValue1, sensorValue2, sensorValue3, sensorValue4, sensorValue5, sensorValue6, sensorValue7, sensorSum;
+  int sensorSum;
   float sensorAverage, sensorPosition;
-
-  sensorValue0 = *(sensorArray + 0);
-  sensorValue1 = *(sensorArray + 1);
-  sensorValue2 = *(sensorArray + 2);
-  sensorValue3 = *(sensorArray + 3);
-  sensorValue4 = *(sensorArray + 4);
-  sensorValue5 = *(sensorArray + 5);
-  sensorValue6 = *(sensorArray + 6);
-  sensorValue7 = *(sensorArray + 7);
-
-  sensorSum = sensorValue0 + sensorValue1 + sensorValue2 + sensorValue3 + sensorValue4 + sensorValue5 + sensorValue6 + sensorValue7;
-
-  sensorAverage = (float)((sensorValue0*1) + (sensorValue1*2) + (sensorValue2*3) + (sensorValue3*4) + (sensorValue4*5) + (sensorValue5*6) + (sensorValue6*7) + (sensorValue7*8));
+  
+  sensorSum = sensorData[0] + sensorData[1] + sensorData[2] + sensorData[3] + sensorData[4] + sensorData[5] + sensorData[6] + sensorData[7];
+  
+  sensorAverage = (float)((sensorData[0]*1) + (sensorData[1]*2) + (sensorData[2]*3) + (sensorData[3]*4) + (sensorData[4]*5) + (sensorData[5]*6) + (sensorData[6]*7) + (sensorData[7]*8));
 
   sensorPosition = (float)sensorAverage/(float)sensorSum;
 
@@ -338,4 +284,3 @@ float calculatePosition(int * sensorArray)
 
   return sensorPosition;
 }
-
