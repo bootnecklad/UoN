@@ -19,8 +19,8 @@
 const int BUFFER_VALUE = 2000;
 const int MAX_MOTOR_SPEED = 40;
 const int MIN_MOTOR_SPEED = -40;
-#define leftMotorBaseSpeed 20
-#define rightMotorBaseSpeed 20
+const int leftMotorBaseSpeed = 15;
+const int rightMotorBaseSpeed = 15;
 const int CALIBRATION_DELAY = 2000;
 const int LCD_ROW = 2;
 const int LCD_COLUMN = 16;
@@ -39,7 +39,7 @@ float positionDeviationOld;     // Previous value of how far the sensor has devi
 float errorInPosition;          // Total error of sensor compared to the ideal/initial position
 
 float calibrationConstantP = 2;
-float calibrationConstantI = 0.05;
+float calibrationConstantI = 0.005;
 float calibrationConstantD = 1;
 
 // setups serial port for car controller board
@@ -161,13 +161,24 @@ Serial.print(lowByte((int)moveAmount)); // Serial.print throws bytes out  */
 
 {
   double moveAmount; //difference; // Move amount is a % of the total motor speed, 100% being fastest and 0% being nothing
-
-  int leftMotorSpeed, rightMotorSpeed;
-
+  
+  int leftMotorSpeed, rightMotorSpeed, straightMotorSpeed;
+  
   moveAmount = (errorInPosition / BUFFER_VALUE)*MAX_MOTOR_SPEED; // Move amount of motor is based on the error value
 
   leftMotorSpeed = leftMotorBaseSpeed - moveAmount;     // Calculate the modified motor speed
   rightMotorSpeed = rightMotorBaseSpeed + moveAmount;
+
+  if(errorInPosition < 400 && errorInPosition > -400)    //An attempt to make the car speed up when going stright, currently not working as intended
+  {
+    straightMotorSpeed = straightMotorSpeed + 1;
+    leftMotorSpeed = leftMotorBaseSpeed + straightMotorSpeed;
+    rightMotorSpeed = rightMotorBaseSpeed + straightMotorSpeed;
+  }
+  else
+  {
+    straightMotorSpeed = 0;
+  }
 
   // Apply new speed and direction to each motor
   if(leftMotorSpeed > 0)
