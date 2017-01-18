@@ -17,7 +17,6 @@
 
 // Global Constants
 const int BUFFER_VALUE = 2000;
-const int REVERSE_CASE = 1500;
 const int MAX_MOTOR_SPEED = 40;
 const int MIN_MOTOR_SPEED = -40;
 #define leftMotorBaseSpeed 20
@@ -180,8 +179,8 @@ Serial.print(lowByte((int)moveAmount)); // Serial.print throws bytes out  */
   }
   else
   {
+    leftMotorSpeed = leftMotorSpeed * 4;   //Makes the car accelerate in reverse 4 times faster than going forwards
     leftMotorSpeed = constrain(leftMotorSpeed, MIN_MOTOR_SPEED, 0);
-    leftMotorSpeed = leftMotorSpeed - leftMotorBaseSpeed;
     carController.write("#D1r");
     carController.write("#S1");
     carController.print(-(int)leftMotorSpeed);
@@ -196,8 +195,8 @@ Serial.print(lowByte((int)moveAmount)); // Serial.print throws bytes out  */
   }
   else
   {
+    rightMotorSpeed = rightMotorSpeed * 4;    //Makes the car accelerate in reverse 4 times faster than going forwards
     rightMotorSpeed = constrain(rightMotorSpeed, MIN_MOTOR_SPEED, 0);
-    rightMotorSpeed = rightMotorSpeed - rightMotorBaseSpeed;
     carController.write("#D2r");
     carController.write("#S2");
     carController.print(-(int)rightMotorSpeed);
@@ -252,7 +251,7 @@ float calculateError(float sensorPosition)
 
   D = calibrationConstantD*positionDeviationToIdeal;
 
-  errorInPosition = P + constrain(I, -500, 500); + D;
+  errorInPosition = P + constrain(I, -500, 500) + D;
 
   return errorInPosition;
 }
