@@ -38,6 +38,8 @@ float positionDeviationSum;     // Continuous sum of how far the sensor has devi
 float positionDeviationOld;     // Previous value of how far the sensor has deviated over time
 float errorInPosition;          // Total error of sensor compared to the ideal/initial position
 
+float straightMotorSpeed;       //Used to smoothly accelerate the car when going straight
+
 float calibrationConstantP = 2;
 float calibrationConstantI = 0.005;
 float calibrationConstantD = 1;
@@ -162,16 +164,16 @@ Serial.print(lowByte((int)moveAmount)); // Serial.print throws bytes out  */
 {
   double moveAmount; //difference; // Move amount is a % of the total motor speed, 100% being fastest and 0% being nothing
   
-  int leftMotorSpeed, rightMotorSpeed, straightMotorSpeed;
+  int leftMotorSpeed, rightMotorSpeed;
   
   moveAmount = (errorInPosition / BUFFER_VALUE)*MAX_MOTOR_SPEED; // Move amount of motor is based on the error value
 
   leftMotorSpeed = leftMotorBaseSpeed - moveAmount;     // Calculate the modified motor speed
   rightMotorSpeed = rightMotorBaseSpeed + moveAmount;
 
-  if(errorInPosition < 400 && errorInPosition > -400)    //An attempt to make the car speed up when going stright, currently not working as intended
+  if(errorInPosition < 300 && errorInPosition > -300)    //An attempt to make the car speed up when going stright, currently not working as intended
   {
-    straightMotorSpeed = straightMotorSpeed + 1;
+    straightMotorSpeed = straightMotorSpeed + 0.2;
     leftMotorSpeed = leftMotorBaseSpeed + straightMotorSpeed;
     rightMotorSpeed = rightMotorBaseSpeed + straightMotorSpeed;
   }
@@ -282,7 +284,7 @@ float calculatePosition()
 
   sensorPosition = (float)sensorAverage/(float)sensorSum;
 
-  sensorPosition = sensorPosition * 2000;
+  sensorPosition = sensorPosition * 2000;   // Used the make the numbers work nicely, probably unnecessary but would require a rework of a bunch of values
 
   return sensorPosition;
 }
