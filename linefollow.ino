@@ -171,7 +171,7 @@ Serial.print(lowByte((int)moveAmount)); // Serial.print throws bytes out  */
   leftMotorSpeed = leftMotorBaseSpeed - moveAmount;     // Calculate the modified motor speed
   rightMotorSpeed = rightMotorBaseSpeed + moveAmount;
 
-  if(errorInPosition < 300 && errorInPosition > -300)    //An attempt to make the car speed up when going stright, currently not working as intended
+  if(errorInPosition < 300 && errorInPosition > -300)    //An attempt to make the car speed up when going straight
   {
     straightMotorSpeed = straightMotorSpeed + 0.2;
     leftMotorSpeed = leftMotorBaseSpeed + straightMotorSpeed;
