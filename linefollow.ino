@@ -43,7 +43,7 @@ float calibrationConstantP = 2;       // The 3 constants to be changed in PID co
 float calibrationConstantI = 0.005;   // These will likely be different for every course and every vehicle
 float calibrationConstantD = 1;
 
-// setups serial port for car controller board
+// Sets up serial port for car controller board
 #include <SoftwareSerial.h>
 SoftwareSerial carController(9, 10);
 
@@ -174,7 +174,7 @@ void moveMotors(float errorInPosition)
   }
   else
   {
-    straightMotorSpeed = 0;
+    straightMotorSpeed = 0;     // Causes the acceleration to reset if error is not small
   }
 
   // Apply new speed and direction to each motor
