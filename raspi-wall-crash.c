@@ -35,6 +35,7 @@ void setup()
     delay(30);
 }
 
+
 float getCM()       //Function to calculate the distance a single pulse has travelled in cm
 {
     //Send trig pulse
@@ -74,13 +75,29 @@ float getCM()       //Function to calculate the distance a single pulse has trav
     return distance;
 }
 
+
+float averageRefDistance()
+{
+	int count;
+	float average = 0;
+	int trails = 10;
+	for (count = 0 ; count < trails ; count++)
+	{
+		average += getCM();
+	}
+return (average/(float) trails);
+}
+
+
+
+
 float averageDistance()
 {
     int i;
 
     float distance, unAveragedDistance, oldUnaveragedDistance, changeInDistance;
-
-	oldUnaveragedDistance = getCM();
+	
+	oldUnaveragedDistance = averageRefDistance();
 
     for(i = 0; i < DISTANCE_AVERAGE_NUMBER+1; i++)
     {
@@ -88,7 +105,7 @@ float averageDistance()
         {
             unAveragedDistance = getCM();
             changeInDistance = oldUnaveragedDistance - unAveragedDistance;
-            if(changeInDistance < 5)
+            if(changeInDistance < 2)
             {
 				oldUnaveragedDistance = unAveragedDistance;
 			}
