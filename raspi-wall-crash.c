@@ -35,7 +35,6 @@ void setup()
     delay(30);
 }
 
-
 float getCM()       //Function to calculate the distance a single pulse has travelled in cm
 {
     //Send trig pulse
@@ -75,47 +74,26 @@ float getCM()       //Function to calculate the distance a single pulse has trav
     return distance;
 }
 
-
-float averageRefDistance()
-{
-	int count;
-	float average = 0;
-	int trails = 10;
-	for (count = 0 ; count < trails ; count++)
-	{
-		average += getCM();
-	}
-return (average/(float) trails);
-}
-
-
-
-
 float averageDistance()
 {
     int i;
 
-    float distance, unAveragedDistance, oldUnaveragedDistance, changeInDistance;
-	
-	oldUnaveragedDistance = averageRefDistance();
+    float distance = 0, unAveragedDistance, oldUnaveragedDistance, changeInDistance;
 
     for(i = 0; i < DISTANCE_AVERAGE_NUMBER+1; i++)
     {
         do
         {
+            oldUnaveragedDistance = getCM();
+            delay(10);
             unAveragedDistance = getCM();
             changeInDistance = oldUnaveragedDistance - unAveragedDistance;
-            if(changeInDistance < 2)
+            if(changeInDistance > 5 || changeInDistance < -5)
             {
-				oldUnaveragedDistance = unAveragedDistance;
-			}
-			else
-			{
-				unAveragedDistance = oldUnaveragedDistance;
+				unAveragedDistance = -1;
 			}
         }
         while(unAveragedDistance == -1);                //If unAveragedDistance is -1 then time out has occurred - take another reading
-
         distance += unAveragedDistance;
     }
 
@@ -143,20 +121,22 @@ int main(void)
 
     float distance;
 
-	serialPrintf(fd, "#Bbff96,100");
+	serialPrintf(fd, "#Bbff020,020");
     do
     {
-        distance = averageDistance();
+        //distance = averageDistance();
+        distance = getCM();
         lcdPosition(lcd, 0, 0);
         lcdPrintf(lcd, "%.2f", distance);
     }
-    while(distance > 77);
+    while(distance > 20);
 
     serialPrintf(fd, "#Hb");
     
     for( ; ; )
     {
-		distance = averageDistance();
+		//distance = averageDistance();
+        distance = getCM();
         lcdPosition(lcd, 0, 1);
         lcdPrintf(lcd, "%.2f", distance);
 	}
