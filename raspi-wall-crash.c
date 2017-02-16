@@ -22,10 +22,11 @@
 
 void setup()
 {
-    if (wiringPiSetup () == -1)
-    {
-        fprintf (stdout, "Unable to start wiringPi: %s\n", strerror (errno)) ;
-    }
+ //   if (wiringPiSetup () == -1)			Seems to not work? Function strerror no longer exists?
+ //  {
+ //       fprintf (stdout, "Unable to start wiringPi: %d\n", strerror (errno)) ;
+ //   }
+	wiringPiSetup ();
     pinMode(TRIG, OUTPUT);
     pinMode(ECHO, INPUT);
 
@@ -77,13 +78,24 @@ float averageDistance()
 {
     int i;
 
-    float distance, unAveragedDistance;
+    float distance, unAveragedDistance, oldUnaveragedDistance, changeInDistance;
+
+	oldUnaveragedDistance = getCM();
 
     for(i = 0; i < DISTANCE_AVERAGE_NUMBER+1; i++)
     {
         do
         {
             unAveragedDistance = getCM();
+            changeInDistance = oldUnaveragedDistance - unAveragedDistance;
+            if(changeInDistance < 5)
+            {
+				oldUnaveragedDistance = unAveragedDistance;
+			}
+			else
+			{
+				unAveragedDistance = oldUnaveragedDistance;
+			}
         }
         while(unAveragedDistance == -1);                //If unAveragedDistance is -1 then time out has occurred - take another reading
 
@@ -97,7 +109,7 @@ int main(void)
 {
     setup();
 
-    int lcd, fd, count;
+    int lcd, fd;
 
     lcd = lcdInit(2, 16, 4, LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7, 0, 0, 0, 0);
     lcdPuts(lcd, "Hello, world!");
@@ -106,24 +118,31 @@ int main(void)
 
     fd = serialOpen("/dev/ttyAMA0", 57600);
 
-    if (fd < 0)
-    {
-        fprintf (stderr, "Unable to open serial device: %s\n", strerror (errno)) ;
-        return 1 ;
-    }
+//    if (fd < 0)			strerror no longer exists
+//    {
+//        fprintf (stderr, "Unable to open serial device: %d\n", strerror (errno)) ;
+//        return 1 ;
+//    }
 
     float distance;
 
+	serialPrintf(fd, "#Bbff96,100");
     do
     {
-        serialPrintf(fd, "#Bbff040,040");
         distance = averageDistance();
         lcdPosition(lcd, 0, 0);
         lcdPrintf(lcd, "%.2f", distance);
     }
-    while(distance > 20);
+    while(distance > 77);
 
     serialPrintf(fd, "#Hb");
-
+    
+    for( ; ; )
+    {
+		distance = averageDistance();
+        lcdPosition(lcd, 0, 1);
+        lcdPrintf(lcd, "%.2f", distance);
+	}
+	
     return 0 ;
 }
