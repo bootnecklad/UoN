@@ -10,10 +10,10 @@
 
 int lcd, robot;     // Variables to store numeric identifiers for wiringPi
 
-const int MAX_MOTOR_SPEED = 50;
-const int MIN_MOTOR_SPEED = -50;
-const int leftMotorBaseSpeed = 30;
-const int rightMotorBaseSpeed = 30;
+const int MAX_MOTOR_SPEED = 30;
+const int MIN_MOTOR_SPEED = -30;
+const int leftMotorBaseSpeed = 15;
+const int rightMotorBaseSpeed = 15;
 const int BUFFER_VALUE = 1000;
 
 void setup(void)
@@ -35,11 +35,11 @@ void setup(void)
     lcdPosition(lcd, 0,0);
     lcdPuts(lcd, "Hello World!");
 
-    pinMode(servo, OUTPUT);     // Configure the output to the camera servo and set to a default position
-    digitalWrite(servo, LOW);
-    softPwmCreate(servo,100,200);   // (pin, initial position, range)
-    delay(3000);
-    softPwmStop(servo);
+    //pinMode(servo, OUTPUT);     // Configure the output to the camera servo and set to a default position
+    //digitalWrite(servo, LOW);
+    //softPwmCreate(servo,100,200);   // (pin, initial position, range)
+    //delay(3000);
+    //softPwmStop(servo);
 
     setupCamera(320, 240);  // Enable the camera for OpenCV
 }
@@ -83,7 +83,7 @@ float proportional_old = 0;
 double calculate_position(int x)
 {
     float proportional, derivative;
-    float p_constant = 7.5, i_constant = 0.01, d_constant = 1.8;
+    float p_constant = 10, i_constant = 0.4, d_constant = 10;
     double error;
 
     proportional = x;
@@ -101,8 +101,6 @@ double calculate_position(int x)
 
     return(error);
 }
-
-
 
 void moveMotors(double errorInPosition)
 // INTERNAL FUNCTION: moveMotors()
@@ -171,11 +169,42 @@ void moveMotors(double errorInPosition)
 }
 
 
+int find_contour_centre(Mat strip,String name)
+{
+    Point centre;
+    do
+    {
+        std::vector<std::vector<Point> >  cont;
+        std::vector<Vec4i> hierarchy;
+        Mat gray,blur,thresholded;
+        cv::cvtColor(strip,gray, cv::COLOR_BGR2GRAY);
+        cv::GaussianBlur(gray,blur, Size(5,5),0);
+        cv::threshold(blur,thresholded,60,255,cv::THRESH_BINARY_INV);
+        cv::findContours(thresholded,cont,hierarchy,0,cv::CHAIN_APPROX_NONE);
+
+        if (cont.size() > 0)
+        {
+
+            unsigned int i;
+
+            for (i =0 ; i<cont.size(); ++i)
+            {
+                centre = findContourCentre(cont[i]);
+            }
+            cv::drawContours(strip,cont,-1,Scalar(30,255,255),5);
+            cv::imshow(name,strip);
+        }
+    }while(centre.x > 1000 || centre.x < -1000);
+    printf("\n Centre: %d\n", centre.x - 160);
+    return (centre.x-160);
+}
+
 int main( int argc, char** argv )
 {
     setup();    // Call a setup function to prepare IO and devices
 
-    cv::namedWindow("Photo");   // Create a GUI window called photo
+    cv::namedWindow("Middle Strip");   // Create a GUI window called photo
+    cv::namedWindow("Top Strip");
 
     //Mat ramp_template;
 
@@ -183,8 +212,6 @@ int main( int argc, char** argv )
 
     //ramp_template_thresholded = imread("/home/pi/image_processing/images/Symbols.bmp", CV_LOAD_IMAGE_UNCHANGED);
     //Mat frame = imread("/home/pi/image_processing/images/test.bmp", CV_LOAD_IMAGE_UNCHANGED);
-
-
 
     //cvtColor(ramp_template, ramp_templateHSV, COLOR_BGR2HSV); // Convert the image to HSV
     //inRange(ramp_templateHSV, Scalar(120, 0, 109), Scalar(179, 255, 212), ramp_template_thresholded);
@@ -198,68 +225,23 @@ int main( int argc, char** argv )
 
     while(1)    // Main loop to perform image processing
     {
-        Mat gray,blur,thresholded,frame;
-        std::vector<std::vector<Point> >  cont;
-        std::vector<Vec4i> hierarchy;
-        std::vector<cv::Point> largercontour;
-        std::vector<cv::Point> con_hull;
+        Mat frame_middle, frame_top;
+        double error_middle, error_top;
 
-        Rect a(0,119,320,2);
+        Rect a(0, 119, 320, 2);
+        Rect b(0, 0, 320, 2);
         Mat frame_org = captureFrame(); // Capture a frame from the camera and store in a new matrix variable
-        frame = frame_org(a);
-        cv::cvtColor(frame,gray, cv::COLOR_BGR2GRAY);
-        cv::GaussianBlur(gray,blur, Size(5,5),0);
-        //cv::medianBlur(blur,blur,3);
-        cv::threshold(blur,thresholded,60,255,cv::THRESH_BINARY_INV);
-        cv::findContours(thresholded,cont,hierarchy,0,cv::CHAIN_APPROX_NONE);
-        //cv::findContours(thresholded,cont,CV_RETR_LIST,CV_CHAIN_APPROX_SIMPLE);
-        if (cont.size() > 0)
-        {
+        frame_middle = frame_org(a);
+        frame_top = frame_org(b);
 
-            /*cv::max(cont,cv::contourArea(cont),);
-            c = cv::max(contours, key=cv2.contourArea);
-            M = cv2.moments(c);
+        error_middle = calculate_position(find_contour_centre(frame_middle,"Middle Strip"));
+        error_top = calculate_position(find_contour_centre(frame_top,"Top Strip"));
 
-            cx = int(M['m10']/M['m00'])
-            cy = int(M['m01']/M['m00'])
+        double error = error_middle + error_top;
 
-            cv2.line(crop_img,(cx,0),(cx,720),(255,0,0),1)
-            cv2.line(crop_img,(0,cy),(1280,cy),(255,0,0),1)
+        moveMotors(error);
 
-
-
-            */
-            unsigned int i;
-            Point centre;
-            for (i =0 ; i<cont.size(); ++i)
-            {
-                //int area = (int) cv::contourArea(cont[i]);
-
-                //if (area > max_area)
-                // {
-                //  largercontour = cont[i];
-                // max_area = area;
-                centre = findContourCentre(cont[i]);
-                //}
-
-            }
-            /*cv::approxPolyDP(cv::Mat(largercontour),largercontour,5,true);
-            cv::convexHull(largercontour,con_hull,false);
-            if(con_hull.size()>=3)
-            {i9u
-                cv::Moments con_mo = cv::moments(con_hull);
-                cv::Point centre = cv::Point((con_mo.m10/con_mo.m00) , (con_mo.m01/con_mo.m00));
-                //cv::circle(frame,centre,1,Scalar(30,0,255),1);
-            }*/
-            //cv::circle(frame,centre,1,Scalar(30,0,255),1);
-            printf("x = %d     y = %d\n",centre.x-160,centre.y);
-            cv::drawContours(frame,cont,-1,Scalar(30,255,255),5);
-
-            moveMotors(calculate_position(centre.x-160));
-
-        }
-
-        cv::imshow("Photo",frame); //Display the image in the window
+        //cv::imshow("Photo",frame_middle); //Display the image in the window
 
         //Mat frameGray, edges, frameHSV, thresholded, ramp_template_output;
 
@@ -370,17 +352,16 @@ int main( int argc, char** argv )
         if (key == 27)
         {
             serialPrintf(robot, "#Hb");
-
-            break;
+            closeCV();  // Disable the camera and close any windows
+            return 0;
         }
+
+        if(key>0)
+            printf("%d\n", key);
+
     }
 
-    //closeCV();  // Disable the camera and close any windows
-    while(true);
+    closeCV();  // Disable the camera and close any windows
+
     return 0;
 }
-
-
-
-
-
