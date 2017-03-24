@@ -35,16 +35,16 @@ void setup(void)
     lcdPosition(lcd, 0,0);
     lcdPuts(lcd, "Hello World!");
 
-    //pinMode(servo, OUTPUT);     // Configure the output to the camera servo and set to a default position
-    //digitalWrite(servo, LOW);
-    //softPwmCreate(servo,100,200);   // (pin, initial position, range)
-    //delay(3000);
-    //softPwmStop(servo);
+    /*pinMode(servo, OUTPUT);     // Configure the output to the camera servo and set to a default position
+    digitalWrite(servo, LOW);
+    softPwmCreate(servo,100,200);   // (pin, initial position, range)
+    delay(3000);
+    softPwmStop(servo);*/
 
     setupCamera(320, 240);  // Enable the camera for OpenCV
 }
 
-float constrain(float x, float a, float b)
+float constrain(float x, float a, float b)  //Can send any float x and constrain it between a and b
 {
     if(x < a)
     {
@@ -58,63 +58,65 @@ float constrain(float x, float a, float b)
         return x;
 }
 
-double bufferError(double errorInPosition)
-// INTERNAL FUNCTION: bufferError()
-// ARGUMENTS: errorInPosition
-// ARGUMENT TYPES: floating point
-// DESCRIPTION: Limits the created error between certain values, prevents error becoming too large or too small
-{
-    if (errorInPosition > BUFFER_VALUE)
-    {
-        errorInPosition = BUFFER_VALUE;
-    }
+float our_integral_top = 0;     //Called our_integral as integral already used in library
+float proportional_old_top = 0; //Previous value of position, used to calculate the derivative
 
-    if (errorInPosition < -BUFFER_VALUE)
-    {
-        errorInPosition = -BUFFER_VALUE;
-    }
+float our_integral_middle = 0;     //Called our_integral as integral already used in library
+float proportional_old_middle = 0; //Previous value of position, used to calculate the derivative
 
-    return errorInPosition;
-}
-
-float our_integral = 0;
-float proportional_old = 0;
-
-double calculate_position(int x)
+float calculate_error(int x, string strip_position)    //Calculates error using PID calculations
 {
     float proportional, derivative;
     float p_constant = 10, i_constant = 0.4, d_constant = 10;
-    double error;
+    float error;
 
-    proportional = x;
-    printf("P: %.3f \n", proportional);
-    our_integral = our_integral + proportional;
-    our_integral = constrain(our_integral, -500, 500);
-    printf("I: %.3f \n", our_integral);
-    derivative = proportional - proportional_old;
-    printf("D: %.3f \n", derivative);
-    proportional_old = proportional;
+    if(strip_position == "TOP")
+    {
+        proportional = x;           // The proportional term, calculated by finding the current position
+        printf("P: %.3f \n", proportional);
 
-    error = (proportional * p_constant) + (our_integral * i_constant) + (derivative * d_constant);
-    error = bufferError(error);
+        our_integral_top = our_integral_top + proportional;         // The integral term, a sum keeping track of how far away from the line the car is over time
+        our_integral_top = constrain(our_integral_top, -500, 500);
+        printf("I: %.3f \n", our_integral_top);
+
+        derivative = proportional - proportional_old_top;       // The derivative term, this determines how fast the car is moving back towards or away from the line
+        printf("D: %.3f \n", derivative);
+
+        proportional_old_top = proportional;        //Recording the previous value of position
+        error = (proportional * p_constant) + (our_integral_top * i_constant) + (derivative * d_constant);
+    }
+
+    else if(strip_position == "MIDDLE")
+    {
+        proportional = x;           // The proportional term, calculated by finding the current position
+        printf("P: %.3f \n", proportional);
+
+        our_integral_middle = our_integral_middle + proportional;         // The integral term, a sum keeping track of how far away from the line the car is over time
+        our_integral_middle = constrain(our_integral_middle, -500, 500);
+        printf("I: %.3f \n", our_integral_middle);
+
+        derivative = proportional - proportional_old_middle;       // The derivative term, this determines how fast the car is moving back towards or away from the line
+        printf("D: %.3f \n", derivative);
+
+        proportional_old_middle = proportional;
+
+        error = (proportional * p_constant) + (our_integral_middle * i_constant) + (derivative * d_constant);
+    }
+
+    error = constrain(error, -BUFFER_VALUE, BUFFER_VALUE);
     printf("Error: %.3f \n", error);
 
     return(error);
 }
 
-void moveMotors(double errorInPosition)
+void moveMotors(float errorInPosition)
 // INTERNAL FUNCTION: moveMotors()
-// ARGUMENTS: errorInPosition motorSpeed
+// ARGUMENTS: errorInPosition
 // ARGUMENT TYPES: floating point integer
-// DESCRIPTION: Moves motors at speed in arguements based on the error given
-
-/* ORIGINAL ATTEMPT AT CONTORLLING MOTORS
-  Serial.print(lowByte(motorSpeed)); // Serial.print throws bytes out
-  Serial.write(",0");
-  Serial.print(lowByte((int)moveAmount)); // Serial.print throws bytes out  */
+// DESCRIPTION: Moves motors at speed in arguments based on the error given
 
 {
-    double moveAmount; //difference; // Move amount is a % of the total motor speed, 100% being fastest and 0% being nothing
+    float moveAmount; //difference; // Move amount is a % of the total motor speed, 100% being fastest and 0% being nothing
 
     int leftMotorSpeed, rightMotorSpeed;
 
@@ -139,37 +141,29 @@ void moveMotors(double errorInPosition)
     {
         leftMotorSpeed = constrain((float)leftMotorSpeed, 0, (float)MAX_MOTOR_SPEED);
         serialPrintf(robot, "#D2f#S2%d", (int)leftMotorSpeed);
-        //carController.write("#S1");
-        //carController.print((int)leftMotorSpeed);
     }
     else
     {
         leftMotorSpeed = leftMotorSpeed * 4;     //Makes the car accelerate in reverse 4 times faster than going forwards
         leftMotorSpeed = constrain((float)leftMotorSpeed, (float)MIN_MOTOR_SPEED, 0);
         serialPrintf(robot, "#D2r#S2%d", -(int)leftMotorSpeed);
-        //carController.write("#S1");
-        //carController.print(-(int)leftMotorSpeed);
     }
 
     if (rightMotorSpeed > 0)
     {
         rightMotorSpeed = constrain((float)rightMotorSpeed, 0, (float)MAX_MOTOR_SPEED);
         serialPrintf(robot, "#D1f#S1%d", (int)rightMotorSpeed);
-        //carController.write("#S2");
-        //carController.print((int)rightMotorSpeed);
     }
     else
     {
         rightMotorSpeed = rightMotorSpeed * 4;    //Makes the car accelerate in reverse 4 times faster than going forwards
         rightMotorSpeed = constrain((float)rightMotorSpeed, (float)MIN_MOTOR_SPEED, 0);
         serialPrintf(robot, "#D1r#S1%d", -(int)rightMotorSpeed);
-        //carController.write("#S2");
-        //carController.print(-(int)rightMotorSpeed);
     }
 }
 
 
-int find_contour_centre(Mat strip,String name)
+int find_contour_centre(Mat strip,String name)  //Can be sent an array of pixels, find contours in them and display the results in a named window. Returns the centre point of the contour
 {
     Point centre;
     do
@@ -194,7 +188,8 @@ int find_contour_centre(Mat strip,String name)
             cv::drawContours(strip,cont,-1,Scalar(30,255,255),5);
             cv::imshow(name,strip);
         }
-    }while(centre.x > 1000 || centre.x < -1000);
+    }
+    while(centre.x > 1000 || centre.x < -1000);
     printf("\n Centre: %d\n", centre.x - 160);
     return (centre.x-160);
 }
@@ -226,7 +221,7 @@ int main( int argc, char** argv )
     while(1)    // Main loop to perform image processing
     {
         Mat frame_middle, frame_top;
-        double error_middle, error_top;
+        float error_middle, error_top;
 
         Rect a(0, 119, 320, 2);
         Rect b(0, 0, 320, 2);
@@ -234,10 +229,10 @@ int main( int argc, char** argv )
         frame_middle = frame_org(a);
         frame_top = frame_org(b);
 
-        error_middle = calculate_position(find_contour_centre(frame_middle,"Middle Strip"));
-        error_top = calculate_position(find_contour_centre(frame_top,"Top Strip"));
+        error_middle = calculate_error(find_contour_centre(frame_middle,"Middle Strip"), "MIDDLE");
+        error_top = calculate_error(find_contour_centre(frame_top,"Top Strip"), "TOP");
 
-        double error = error_middle + error_top;
+        float error = error_middle + error_top;
 
         moveMotors(error);
 
@@ -347,7 +342,7 @@ int main( int argc, char** argv )
 
         */
         int key = cv::waitKey(1);   // Wait 1ms for a keypress (required to update windows
-        //}
+
         key = (key==255) ? -1 : key;    // Check if the esc key has been pressed
         if (key == 27)
         {
